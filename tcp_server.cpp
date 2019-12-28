@@ -10,6 +10,7 @@
 #include <sys/epoll.h>
 #include <poll.h> 
 #include <thread>
+#include <mutex>
 #include <unordered_set>
 #include <signal.h>
 #include <stdio.h>
@@ -18,12 +19,13 @@
 
 typedef std::map < std::string, std::unordered_set<int> > Map;
 
+// mutex
+std::mutex mutex;
+
 // server socket
 int servFd;
 
 // client sockets
-std::unordered_set<int> clientFds;
-
 Map queues;
 
 // handles SIGINT
@@ -103,13 +105,15 @@ int main(int argc, char ** argv){
 
 			// add client to clients set
 			// if queue does not exist create it
+			mutex.lock();
 			Map::iterator it = queues.find(queueName);
 			if(it == queues.end()){
 				std::unordered_set<int> clientSet;
 				queues.insert( Map::value_type(queueName, clientSet) );
 			}
 			queues[queueName].insert(clientFd);
-		
+			mutex.unlock();
+
 			while (true)
 			{		
 				if (strcmp(role.c_str(), "producent") == 0){
@@ -133,7 +137,9 @@ int main(int argc, char ** argv){
 					
 					if(count < 1) {
 						printf("removing %d\n", clientFd);
+						mutex.lock();
 						queues[queueName].erase(clientFd);
+						mutex.unlock();
 						close(clientFd);
 						break;
 					} 
@@ -162,10 +168,12 @@ void setReuseAddr(int sock){
 }
 
 void ctrl_c(int){
+	mutex.lock();
 	for(const auto& kv : queues){
 		for(int clientFd : kv.second)
 			close(clientFd);
 	}
+	mutex.unlock();
 	close(servFd);
 	printf("Closing server\n");
 	exit(0);
@@ -174,6 +182,8 @@ void ctrl_c(int){
 void sendToAllBut(int fd, char * buffer, int count, std::string queueName){
 	int res;
 	std::unordered_set<int> bad;
+
+	mutex.lock();
 	for(int clientFd : queues[queueName]){
 		if(clientFd == fd) continue;
 		res = write(clientFd, buffer, count);
@@ -185,4 +195,5 @@ void sendToAllBut(int fd, char * buffer, int count, std::string queueName){
 		queues[queueName].erase(clientFd);
 		close(clientFd);
 	}
+	mutex.unlock();
 }
