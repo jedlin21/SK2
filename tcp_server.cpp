@@ -118,7 +118,7 @@ int main(int argc, char ** argv){
 					int count = read(clientFd, buffer, 255);
 					if(count < 1) {
 						printf("removing %d\n", clientFd);
-						clientFds.erase(clientFd);
+						//clientFds.erase(clientFd);
 						close(clientFd);
 						break;
 					} else {
@@ -133,7 +133,7 @@ int main(int argc, char ** argv){
 					
 					if(count < 1) {
 						printf("removing %d\n", clientFd);
-						clientFds.erase(clientFd);
+						queues[queueName].erase(clientFd);
 						close(clientFd);
 						break;
 					} 
@@ -162,8 +162,10 @@ void setReuseAddr(int sock){
 }
 
 void ctrl_c(int){
-	for(int clientFd : clientFds)
-		close(clientFd);
+	for(const auto& kv : queues){
+		for(int clientFd : kv.second)
+			close(clientFd);
+	}
 	close(servFd);
 	printf("Closing server\n");
 	exit(0);
@@ -180,7 +182,7 @@ void sendToAllBut(int fd, char * buffer, int count, std::string queueName){
 	}
 	for(int clientFd : bad){
 		printf("removing %d\n", clientFd);
-		clientFds.erase(clientFd);
+		queues[queueName].erase(clientFd);
 		close(clientFd);
 	}
 }
