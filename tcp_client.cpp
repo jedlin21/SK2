@@ -68,16 +68,20 @@ int connect(char * ip, char * port, std::string role, std::string queue){
 int main(int argc, char ** argv){
 	if(argc!=5 && argc!=6) error(1,0,"Need 4 or 5 args: ip port producent/consumer queue [sec]");
 	std::string role = argv[3];
+	std::string queue = argv[4];
 
-	int sock = connect(argv[1], argv[2], role, argv[4]); 
+	int sock = connect(argv[1], argv[2], role, queue); 
 	
 	if (strcmp(role.c_str(), "producent") == 0 && argc !=6) error(1,0,"Need 5 args: ip port producent queue sec");
 	
+	int i = 0;
+	std::string message;
 	while (true){
 		if (strcmp(role.c_str(), "producent") == 0){
 			// write to socket
-			
-			sendMessage(sock, "Message!");
+			message = "Message! " + queue + " " + std::to_string(i);
+			i += 1;
+			sendMessage(sock, message);
 			printf("Message sent \n");
 			sleep(atoi(argv[5]));
 		}

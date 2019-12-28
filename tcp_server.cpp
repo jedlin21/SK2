@@ -16,17 +16,31 @@
 #include <stdio.h>
 #include <string.h>
 #include <map>
+#include <vector> 
+#include <ctime>
 
-typedef std::map < std::string, std::unordered_set<int> > Map;
+int HOLDING_TIME = 5;
+
+typedef std::map < std::string, std::unordered_set<int> > MapQueues;
+struct message {
+    std::string mess;
+    time_t time;
+};
+typedef std::map < std::string, std::vector<message> > MapMessages;
 
 // mutex
 std::mutex mutex;
+// time
+time_t currentTime;
 
 // server socket
 int servFd;
 
+// undelivered messages
+MapMessages messagesQueues;
+
 // client sockets
-Map queues;
+MapQueues queues;
 
 // handles SIGINT
 void ctrl_c(int);
@@ -40,11 +54,13 @@ uint16_t readPort(char * txt);
 // sets SO_REUSEADDR
 void setReuseAddr(int sock);
 
+void monitorMessageQueue();
+
 int main(int argc, char ** argv){
 	// get and validate port number
 	if(argc != 2) error(1, 0, "Need 1 arg (port)");
 	auto port = readPort(argv[1]);
-	
+	std::thread (monitorMessageQueue).detach();
 	// create socket
 	servFd = socket(AF_INET, SOCK_STREAM, 0);
 	if(servFd == -1) error(1, errno, "socket failed");
@@ -106,12 +122,22 @@ int main(int argc, char ** argv){
 			// add client to clients set
 			// if queue does not exist create it
 			mutex.lock();
-			Map::iterator it = queues.find(queueName);
+			MapQueues::iterator it = queues.find(queueName);
 			if(it == queues.end()){
 				std::unordered_set<int> clientSet;
-				queues.insert( Map::value_type(queueName, clientSet) );
+				queues.insert( MapQueues::value_type(queueName, clientSet) );
 			}
 			queues[queueName].insert(clientFd);
+			mutex.unlock();
+
+			mutex.lock();
+			if (strcmp(role.c_str(), "consumer") == 0){
+				printf("Send overdue messages");
+				for(message m : messagesQueues[queueName]){
+					printf("%s %d %d\n", m.mess.c_str(), (int)m.time, int(time(& currentTime) - m.time));
+					write(clientFd, m.mess.c_str(), m.mess.size());
+				}
+			}
 			mutex.unlock();
 
 			while (true)
@@ -127,6 +153,9 @@ int main(int argc, char ** argv){
 						break;
 					} else {
 						// broadcast the message
+						mutex.lock();
+						messagesQueues[queueName].push_back({std::string (buffer, count), time( & currentTime)});
+						mutex.unlock();
 						sendToAllBut(clientFd, buffer, count, queueName);
 					}
 				}
@@ -154,6 +183,30 @@ int main(int argc, char ** argv){
 /****************************/
 }
 
+void monitorMessageQueue(){
+	int position = 0;
+	while (true)
+	{
+	mutex.lock();
+	for(const auto& kv : messagesQueues){
+		//printf("queue: %s \n", kv.first.c_str());
+		position = 0;
+		for(message m : kv.second){
+			//printf("%s %d %d\n", m.mess.c_str(), (int)m.time, int(time(& currentTime) - m.time));
+			if( time(& currentTime) - m.time > HOLDING_TIME ){
+				position++;
+			}
+		}
+		if( position != 0){
+			messagesQueues[kv.first].erase(messagesQueues[kv.first].begin(), messagesQueues[kv.first].begin() + position );
+			//printf("position: %d\n", position);
+		}
+	}
+	mutex.unlock();
+	sleep(1);
+	}	
+}
+
 uint16_t readPort(char * txt){
 	char * ptr;
 	auto port = strtol(txt, &ptr, 10);
@@ -170,8 +223,10 @@ void setReuseAddr(int sock){
 void ctrl_c(int){
 	mutex.lock();
 	for(const auto& kv : queues){
-		for(int clientFd : kv.second)
+		for(int clientFd : kv.second){
 			close(clientFd);
+			printf("%d closed \n", clientFd);
+		}
 	}
 	mutex.unlock();
 	close(servFd);
