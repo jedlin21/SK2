@@ -72,20 +72,31 @@ int main(int argc, char ** argv){
 		
 		// tell who has connected
 		printf("new connection from: %s:%hu (fd: %d)\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port), clientFd);
-		char buffer[255];
-		int count = read(clientFd, buffer, 255);
-		// Check for correctness
-		if (count > 0){
-			std::string registerData(buffer, count);
-			printf("%s \n", registerData.c_str());
-		}
-		else{
-			// if message is empty, then sth go wrong
-			continue;
-		}
 		
 /****************************/
+		printf("Start new thread \n");
 		std::thread ( [clientFd] {
+			std::string role, queue;
+			char buffer[255];
+			int count = read(clientFd, buffer, 255);
+			// Check for correctness
+			if (count > 0){
+				std::string registerData(buffer, count);
+				printf("%s \n", registerData.c_str());
+
+				std::size_t pos = registerData.find(";");
+				role = registerData.substr(0, pos);
+				queue = registerData.substr(pos+1);
+				printf("role: %s   queue: %s", role.c_str(), queue.c_str());
+				//Send response to client to confirm connection
+				write(clientFd, "OK", 3);
+			}
+			else{
+				// if message is empty, then sth go wrong
+				printf("An error ocured  \n");
+				// TODO: exit from thread
+			}
+		
 			while (true)
 			{		
 				// read a message

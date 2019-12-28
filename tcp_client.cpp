@@ -8,6 +8,8 @@
 #include <sys/epoll.h>
 #include <poll.h> 
 #include <thread>
+#include <stdio.h>
+#include <string.h>
 
 ssize_t readData(int fd, char * buffer, ssize_t buffsize){
 	auto ret = read(fd, buffer, buffsize);
@@ -25,16 +27,14 @@ void sendMessage(int sock, std::string message){
 	//writeData(sock, buffer2, received2);
 	char cstr[message.size()+1];
 	message.copy(cstr, message.size() + 1);
-	cstr[message.size()] = '\0';
+	cstr[message.size()] = '\n';
 	writeData(sock, cstr, message.size() + 1);
 }
 
-int main(int argc, char ** argv){
-	if(argc!=3) error(1,0,"Need 2 args");
-	
+int connect(char * ip, char * port, std::string role, std::string queue){
 	// Resolve arguments to IPv4 address with a port number
 	addrinfo *resolved, hints={.ai_flags=0, .ai_family=AF_INET, .ai_socktype=SOCK_STREAM};
-	int res = getaddrinfo(argv[1], argv[2], &hints, &resolved);
+	int res = getaddrinfo(ip, port, &hints, &resolved);
 	if(res || !resolved) error(1, 0, "getaddrinfo: %s", gai_strerror(res));
 	
 	// create socket
@@ -47,6 +47,30 @@ int main(int argc, char ** argv){
 	
 	// free memory
 	freeaddrinfo(resolved);
+
+	// Notice server about client role and queue
+	printf("0\n");
+	sendMessage(sock, role+";"+queue);
+	printf("1\n");
+
+	//Check if server response "OK"
+	char buffer1[255];
+	ssize_t received = readData(sock, buffer1, 255);
+	std::string response(buffer1, received);
+	printf("Server response: %s\n", response.c_str());
+	if (strcmp(response.c_str(), "OK") == 0){
+		return sock;
+	}
+	else{
+		printf("Connection error\n");
+		exit(1);
+	}
+}
+
+int main(int argc, char ** argv){
+	if(argc!=3) error(1,0,"Need 2 args: ip port");
+	int sock = connect(argv[1], argv[2], "producent", "zebra");
+	
 	
 /****************************/
 	/*
