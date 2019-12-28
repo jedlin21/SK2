@@ -49,9 +49,7 @@ int connect(char * ip, char * port, std::string role, std::string queue){
 	freeaddrinfo(resolved);
 
 	// Notice server about client role and queue
-	printf("0\n");
 	sendMessage(sock, role+";"+queue);
-	printf("1\n");
 
 	//Check if server response "OK"
 	char buffer1[255];
@@ -68,28 +66,28 @@ int connect(char * ip, char * port, std::string role, std::string queue){
 }
 
 int main(int argc, char ** argv){
-	if(argc!=3) error(1,0,"Need 2 args: ip port");
-	int sock = connect(argv[1], argv[2], "producent", "zebra");
-	
-	
-/****************************/
-	/*
-	// read from socket, write to stdout
-	ssize_t bufsize1 = 255, received1;
-	char buffer1[bufsize1];
-	received1 = readData(sock, buffer1, bufsize1);
-	writeData(1, buffer1, received1);
-	*/
-/****************************/
-	while (true){
-		// write to socket
-		sendMessage(sock, "Message!");
+	if(argc!=5 && argc!=6) error(1,0,"Need 4 or 5 args: ip port producent/consumer queue [sec]");
+	std::string role = argv[3];
 
-		// read from socket, write to stdout
-		ssize_t bufsize1 = 255, received1;
-		char buffer1[bufsize1];
-		received1 = readData(sock, buffer1, bufsize1);
-		writeData(1, buffer1, received1);
+	int sock = connect(argv[1], argv[2], role, argv[4]); 
+	
+	if (strcmp(role.c_str(), "producent") == 0 && argc !=6) error(1,0,"Need 5 args: ip port producent queue sec");
+	
+	while (true){
+		if (strcmp(role.c_str(), "producent") == 0){
+			// write to socket
+			
+			sendMessage(sock, "Message!");
+			printf("Message sent \n");
+			sleep(atoi(argv[5]));
+		}
+		else if (strcmp(role.c_str(), "consumer") == 0){
+			// read from socket, write to stdout
+			ssize_t bufsize1 = 255, received1;
+			char buffer1[bufsize1];
+			received1 = readData(sock, buffer1, bufsize1);
+			writeData(1, buffer1, received1);
+		}
 	}
 /****************************/
 	

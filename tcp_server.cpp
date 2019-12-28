@@ -12,6 +12,11 @@
 #include <thread>
 #include <unordered_set>
 #include <signal.h>
+#include <stdio.h>
+#include <string.h>
+#include <map>
+
+typedef std::map < std::string, std::unordered_set<int> > Map;
 
 // server socket
 int servFd;
@@ -19,11 +24,13 @@ int servFd;
 // client sockets
 std::unordered_set<int> clientFds;
 
+Map queues;
+
 // handles SIGINT
 void ctrl_c(int);
 
 // sends data to clientFds excluding fd
-void sendToAllBut(int fd, char * buffer, int count);
+void sendToAllBut(int fd, char * buffer, int count, std::string queueName);
 
 // converts cstring to port
 uint16_t readPort(char * txt);
@@ -67,16 +74,13 @@ int main(int argc, char ** argv){
 		auto clientFd = accept(servFd, (sockaddr*) &clientAddr, &clientAddrSize);
 		if(clientFd == -1) error(1, errno, "accept failed");
 		
-		// add client to all clients set
-		clientFds.insert(clientFd);
-		
 		// tell who has connected
 		printf("new connection from: %s:%hu (fd: %d)\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port), clientFd);
 		
 /****************************/
 		printf("Start new thread \n");
 		std::thread ( [clientFd] {
-			std::string role, queue;
+			std::string role, queueName;
 			char buffer[255];
 			int count = read(clientFd, buffer, 255);
 			// Check for correctness
@@ -86,8 +90,8 @@ int main(int argc, char ** argv){
 
 				std::size_t pos = registerData.find(";");
 				role = registerData.substr(0, pos);
-				queue = registerData.substr(pos+1);
-				printf("role: %s   queue: %s", role.c_str(), queue.c_str());
+				queueName = registerData.substr(pos+1);
+				printf("role: %s   queue: %s", role.c_str(), queueName.c_str());
 				//Send response to client to confirm connection
 				write(clientFd, "OK", 3);
 			}
@@ -96,21 +100,47 @@ int main(int argc, char ** argv){
 				printf("An error ocured  \n");
 				// TODO: exit from thread
 			}
+
+			// add client to clients set
+			// if queue does not exist create it
+			Map::iterator it = queues.find(queueName);
+			if(it == queues.end()){
+				std::unordered_set<int> clientSet;
+				queues.insert( Map::value_type(queueName, clientSet) );
+			}
+			queues[queueName].insert(clientFd);
 		
 			while (true)
 			{		
-				// read a message
-				char buffer[255];
-				int count = read(clientFd, buffer, 255);
-				
-				if(count < 1) {
-					printf("removing %d\n", clientFd);
-					clientFds.erase(clientFd);
-					close(clientFd);
+				if (strcmp(role.c_str(), "producent") == 0){
+					// read a message
+					char buffer[255];
+					int count = read(clientFd, buffer, 255);
+					if(count < 1) {
+						printf("removing %d\n", clientFd);
+						clientFds.erase(clientFd);
+						close(clientFd);
+						break;
+					} else {
+						// broadcast the message
+						sendToAllBut(clientFd, buffer, count, queueName);
+					}
+				}
+				else if (strcmp(role.c_str(), "consumer") == 0){
+					// read a message
+					char buffer[255];
+					int count = read(clientFd, buffer, 255);
+					
+					if(count < 1) {
+						printf("removing %d\n", clientFd);
+						clientFds.erase(clientFd);
+						close(clientFd);
+						break;
+					} 
+				}
+				else{
+					printf("unknow role: %s\n exit \n", role.c_str());
 					break;
-				} else {
-					// broadcast the message
-					sendToAllBut(clientFd, buffer, count);
 				}
 			}
 		}).detach();
@@ -139,10 +169,10 @@ void ctrl_c(int){
 	exit(0);
 }
 
-void sendToAllBut(int fd, char * buffer, int count){
+void sendToAllBut(int fd, char * buffer, int count, std::string queueName){
 	int res;
-	decltype(clientFds) bad;
-	for(int clientFd : clientFds){
+	std::unordered_set<int> bad;
+	for(int clientFd : queues[queueName]){
 		if(clientFd == fd) continue;
 		res = write(clientFd, buffer, count);
 		if(res!=count)
