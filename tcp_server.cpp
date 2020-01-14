@@ -21,8 +21,9 @@
 
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 
-//global variable with config
+//global structure to hold config
 struct Config {
 	int holdingTime;
 } config;
@@ -56,6 +57,7 @@ void readConfig(std::string filePath = "config.ini") {
 	}
 	configFile.close();
 }
+
 
 typedef std::map < std::string, std::unordered_set<int> > MapQueues;
 struct message {
@@ -162,9 +164,7 @@ int main(int argc, char ** argv){
 				queues.insert( MapQueues::value_type(queueName, clientSet) );
 			}
 			queues[queueName].insert(clientFd);
-			mutex.unlock();
 
-			mutex.lock();
 			if (role == "consumer"){
 				printf("Send overdue messages");
 				for(message m : messagesQueues[queueName]){
@@ -183,6 +183,9 @@ int main(int argc, char ** argv){
 					if(count < 1) {
 						printf("removing %d\n", clientFd);
 						//clientFds.erase(clientFd);
+						mutex.lock();
+						queues[queueName].erase(clientFd);
+						mutex.unlock();
 						close(clientFd);
 						break;
 					} else {
@@ -194,7 +197,7 @@ int main(int argc, char ** argv){
 					}
 				}
 				else if (strcmp(role.c_str(), "consumer") == 0){
-					// read a message
+					// read a message ( wait for EOF )
 					char buffer[255];
 					int count = read(clientFd, buffer, 255);
 					
@@ -209,6 +212,7 @@ int main(int argc, char ** argv){
 				}
 				else{
 					printf("unknow role: %s\n exit \n", role.c_str());
+					close(clientFd);
 					break;
 				}
 			}
@@ -221,11 +225,13 @@ void monitorMessageQueue(){
 	int position = 0;
 	while (true)
 	{
+	bool empty = true;
 	mutex.lock();
 	for(const auto& kv : messagesQueues){
 		//printf("queue: %s \n", kv.first.c_str());
 		position = 0;
 		for(message m : kv.second){
+			empty = false;
 			//printf("%s %d %d\n", m.mess.c_str(), (int)m.time, int(time(& currentTime) - m.time));
 			if( time(& currentTime) - m.time > config.holdingTime ){
 				position++;
@@ -235,6 +241,15 @@ void monitorMessageQueue(){
 			messagesQueues[kv.first].erase(messagesQueues[kv.first].begin(), messagesQueues[kv.first].begin() + position );
 			//printf("position: %d\n", position);
 		}
+		if( empty ) {
+			if (queues[kv.first].empty()) {
+				//drop a queue
+				printf("Dropping queue %s\n", kv.first.c_str());
+				queues.erase(queues.find(kv.first));
+				messagesQueues.erase(messagesQueues.find(kv.first));
+			}
+		}
+
 	}
 	mutex.unlock();
 	sleep(1);
