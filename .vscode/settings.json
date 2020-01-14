@@ -46,6 +46,11 @@
         "map": "cpp",
         "condition_variable": "cpp",
         "cstring": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "iostream": "cpp"
     }
 }

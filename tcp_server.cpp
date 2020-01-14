@@ -19,7 +19,43 @@
 #include <vector> 
 #include <ctime>
 
-int HOLDING_TIME = 5;
+#include <fstream>
+#include <iostream>
+
+//global variable with config
+struct Config {
+	int holdingTime;
+} config;
+
+void readConfig(std::string filePath = "config.ini") {
+	std::ifstream configFile;
+	configFile.open(filePath);
+	if (configFile.is_open())
+	{
+		std::string line;
+		std::string key;
+		std::string value;
+		while( std::getline(configFile, line))
+		{
+			size_t pos = 0;
+			std::string token;
+			while ((pos = line.find('=')) != std::string::npos) {
+				token = line.substr(0, pos);
+				key = token;
+				line.erase(0, pos + 1);
+			}
+			value = line;
+			if (key == "holdingTime")
+				config.holdingTime = std::stoi(value);
+		}
+	}
+	else
+	{
+		printf("An error occured while reading config file!");
+		exit(1);
+	}
+	configFile.close();
+}
 
 typedef std::map < std::string, std::unordered_set<int> > MapQueues;
 struct message {
@@ -64,12 +100,10 @@ int main(int argc, char ** argv){
 	// create socket
 	servFd = socket(AF_INET, SOCK_STREAM, 0);
 	if(servFd == -1) error(1, errno, "socket failed");
-	
 	// graceful ctrl+c exit
 	signal(SIGINT, ctrl_c);
 	// prevent dead sockets from throwing pipe errors on write
 	signal(SIGPIPE, SIG_IGN);
-	
 	setReuseAddr(servFd);
 	
 	// bind to any address and port provided in arguments
@@ -80,6 +114,7 @@ int main(int argc, char ** argv){
 	// enter listening mode
 	res = listen(servFd, 1);
 	if(res) error(1, errno, "listen failed");
+	readConfig();
 	
 /****************************/
 	
@@ -87,7 +122,6 @@ int main(int argc, char ** argv){
 		// prepare placeholders for client address
 		sockaddr_in clientAddr{0};
 		socklen_t clientAddrSize = sizeof(clientAddr);
-		
 		// accept new connection
 		auto clientFd = accept(servFd, (sockaddr*) &clientAddr, &clientAddrSize);
 		if(clientFd == -1) error(1, errno, "accept failed");
@@ -131,7 +165,7 @@ int main(int argc, char ** argv){
 			mutex.unlock();
 
 			mutex.lock();
-			if (strcmp(role.c_str(), "consumer") == 0){
+			if (role == "consumer"){
 				printf("Send overdue messages");
 				for(message m : messagesQueues[queueName]){
 					printf("%s %d %d\n", m.mess.c_str(), (int)m.time, int(time(& currentTime) - m.time));
@@ -193,7 +227,7 @@ void monitorMessageQueue(){
 		position = 0;
 		for(message m : kv.second){
 			//printf("%s %d %d\n", m.mess.c_str(), (int)m.time, int(time(& currentTime) - m.time));
-			if( time(& currentTime) - m.time > HOLDING_TIME ){
+			if( time(& currentTime) - m.time > config.holdingTime ){
 				position++;
 			}
 		}
