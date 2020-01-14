@@ -70,9 +70,13 @@ int main(int argc, char ** argv){
 	std::string role = argv[3];
 	std::string queue = argv[4];
 
+	// queue's name can't be longer than 240 characters
+	if ( queue.length() > 240 ) error(1,0,"Queue's name can not be longer than 240 characters!");
+
+	if (strcmp(role.c_str(), "producent") == 0 && argc !=6) error(1,0,"Need 5 args: ip port producent queue sec");
+
 	int sock = connect(argv[1], argv[2], role, queue); 
 	
-	if (strcmp(role.c_str(), "producent") == 0 && argc !=6) error(1,0,"Need 5 args: ip port producent queue sec");
 	
 	int i = 0;
 	std::string message;
