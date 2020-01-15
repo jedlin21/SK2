@@ -25,6 +25,7 @@
 
 //global structure to hold config
 struct Config {
+	// number of seconds after messages are terminated
 	int holdingTime;
 } config;
 
@@ -225,10 +226,10 @@ void monitorMessageQueue(){
 	int position = 0;
 	while (true)
 	{
-	bool empty = true;
 	mutex.lock();
 	for(const auto& kv : messagesQueues){
 		//printf("queue: %s \n", kv.first.c_str());
+		bool empty = true;
 		position = 0;
 		for(message m : kv.second){
 			empty = false;
@@ -243,7 +244,7 @@ void monitorMessageQueue(){
 		}
 		if( empty ) {
 			if (queues[kv.first].empty()) {
-				//drop a queue
+				//drop a queue without messages and clients
 				printf("Dropping queue %s\n", kv.first.c_str());
 				queues.erase(queues.find(kv.first));
 				messagesQueues.erase(messagesQueues.find(kv.first));
