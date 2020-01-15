@@ -11,6 +11,47 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <fstream>
+#include <iostream>
+
+//global structure to hold config
+struct Config {
+	// number of seconds after messages are terminated
+	int holdingTime;
+	// length of message which producent is sending through queue
+	int producentMessageLength;
+} config;
+
+void readConfig(std::string filePath = "config.ini") {
+	std::ifstream configFile;
+	configFile.open(filePath);
+	if (configFile.is_open())
+	{
+		std::string line;
+		std::string key;
+		std::string value;
+		while( std::getline(configFile, line))
+		{
+			size_t pos = 0;
+			std::string token;
+			while ((pos = line.find('=')) != std::string::npos) {
+				token = line.substr(0, pos);
+				key = token;
+				line.erase(0, pos + 1);
+			}
+			value = line;
+			if (key == "producentMessageLength")
+				config.producentMessageLength = std::stoi(value);
+		}
+	}
+	else
+	{
+		printf("An error occured while reading config file!");
+		exit(1);
+	}
+	configFile.close();
+}
+
 ssize_t readData(int fd, char * buffer, ssize_t buffsize){
 	auto ret = read(fd, buffer, buffsize);
 	if(ret==-1) error(1,errno, "read failed on descriptor %d", fd);
@@ -75,26 +116,46 @@ int main(int argc, char ** argv){
 
 	if (strcmp(role.c_str(), "producent") == 0 && argc !=6) error(1,0,"Need 5 args: ip port producent queue sec");
 
+	readConfig();
+
 	int sock = connect(argv[1], argv[2], role, queue); 
-	
+
+	//	Prepare ultra long message
+	std::string ultraLongMessage;
+	while (ultraLongMessage.length() < config.producentMessageLength)
+		ultraLongMessage += 'a';
 	
 	int i = 0;
 	std::string message;
 	while (true){
 		if (strcmp(role.c_str(), "producent") == 0){
+			
 			// write to socket
-			message = "Message! " + queue + " " + std::to_string(i);
+			message = "Message! " + queue + " " + std::to_string(i) + " ";
+
+			message += ultraLongMessage.substr(0, (config.producentMessageLength) - message.length());
 			i += 1;
 			sendMessage(sock, message);
-			printf("Message sent \n");
+			int msgLength = message.length();
+			printf("Message sent, message length = %i\n", msgLength);
 			sleep(atoi(argv[5]));
 		}
 		else if (strcmp(role.c_str(), "consumer") == 0){
 			// read from socket, write to stdout
-			ssize_t bufsize1 = 255, received1;
-			char buffer1[bufsize1];
-			received1 = readData(sock, buffer1, bufsize1);
-			writeData(1, buffer1, received1);
+			std::string receivedMessage;
+			char buffer1[255];
+
+			int count = read(sock, buffer1, 255);
+			if(count == -1) error(1,errno, "read failed on descriptor %d", sock);
+			if ( count > 0 ){
+				receivedMessage += std::string(buffer1, strlen(buffer1));
+				while ((count = recv(sock, buffer1, 255, MSG_DONTWAIT)) > 0) {
+					receivedMessage += std::string(buffer1, count);
+				}
+			}
+
+			sendMessage(1, receivedMessage);
+			printf("Received message. Length = %i\n", (int)(receivedMessage.length()));
 		}
 	}
 /****************************/

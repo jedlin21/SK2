@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -27,6 +28,8 @@
 struct Config {
 	// number of seconds after messages are terminated
 	int holdingTime;
+	// length of message which producent is sending through queue
+	int producentMessageLength;
 } config;
 
 void readConfig(std::string filePath = "config.ini") {
@@ -85,7 +88,7 @@ MapQueues queues;
 void ctrl_c(int);
 
 // sends data to clientFds excluding fd
-void sendToAllBut(int fd, char * buffer, int count, std::string queueName);
+void sendToAllBut(int fd, std::string message, int count, std::string queueName);
 
 // converts cstring to port
 uint16_t readPort(char * txt);
@@ -117,6 +120,8 @@ int main(int argc, char ** argv){
 	// enter listening mode
 	res = listen(servFd, 1);
 	if(res) error(1, errno, "listen failed");
+
+	// read configuration from config.ini file
 	readConfig();
 	
 /****************************/
@@ -177,11 +182,19 @@ int main(int argc, char ** argv){
 
 			while (true)
 			{		
-				if (strcmp(role.c_str(), "producent") == 0){
+				if (role == "producent"){
 					// read a message
 					char buffer[255];
+					std::string receivedMessage;
 					int count = read(clientFd, buffer, 255);
-					if(count < 1) {
+					// check if there are more bytes for full message
+					if ( count > 0 ){
+						receivedMessage += std::string(buffer, strlen(buffer));
+						while ((count = recv(clientFd, buffer, 255, MSG_DONTWAIT)) > 0) {
+							receivedMessage += std::string(buffer, count);
+						}
+					}
+					if( receivedMessage.length() == 0 ) {
 						printf("removing %d\n", clientFd);
 						//clientFds.erase(clientFd);
 						mutex.lock();
@@ -192,17 +205,24 @@ int main(int argc, char ** argv){
 					} else {
 						// broadcast the message
 						mutex.lock();
-						messagesQueues[queueName].push_back({std::string (buffer, count), time( & currentTime)});
+						messagesQueues[queueName].push_back({receivedMessage, time( & currentTime)});
 						mutex.unlock();
-						sendToAllBut(clientFd, buffer, count, queueName);
+						sendToAllBut(clientFd, receivedMessage, receivedMessage.length(), queueName);
 					}
 				}
-				else if (strcmp(role.c_str(), "consumer") == 0){
+				else if (role == "consumer"){
 					// read a message ( wait for EOF )
 					char buffer[255];
+					std::string receivedMessage;
 					int count = read(clientFd, buffer, 255);
-					
-					if(count < 1) {
+					// check if there are more bytes for full message
+					if ( count > 0 ){
+						receivedMessage += std::string(buffer, count);
+						while ((count = recv(clientFd, buffer, 255, MSG_DONTWAIT)) > 0) {
+							receivedMessage += std::string(buffer, count);
+						}
+					}
+					if(receivedMessage.length() == 0) {
 						printf("removing %d\n", clientFd);
 						mutex.lock();
 						queues[queueName].erase(clientFd);
@@ -284,14 +304,18 @@ void ctrl_c(int){
 	exit(0);
 }
 
-void sendToAllBut(int fd, char * buffer, int count, std::string queueName){
+void sendToAllBut(int fd, std::string message, int count, std::string queueName){
 	int res;
 	std::unordered_set<int> bad;
 
 	mutex.lock();
 	for(int clientFd : queues[queueName]){
 		if(clientFd == fd) continue;
-		res = write(clientFd, buffer, count);
+		char cstr[count+1];
+		message.copy(cstr, count + 1);
+		cstr[count] = '\n';
+		res = write(clientFd, cstr, count);
+		if (res == -1) error(1, errno, "write failed on descriptor %d", fd);
 		if(res!=count)
 			bad.insert(clientFd);
 	}
