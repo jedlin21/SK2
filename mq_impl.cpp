@@ -1,11 +1,11 @@
-#include "mq.h"
+#include "mq_impl.h"
 
 //Server
 
 //global structure to hold config
 struct Config config;
 
-void readConfig(std::string filePath = "config.ini") {
+static void readConfig(std::string filePath = "config.ini") {
 	std::ifstream configFile;
 	configFile.open(filePath);
 	if (configFile.is_open())
@@ -40,24 +40,24 @@ typedef std::map < std::string, std::unordered_set<int> > MapQueues;
 typedef std::map < std::string, std::vector<message> > MapMessages;
 
 // mutex
-std::mutex mutex;
+static std::mutex mutex;
 // time
-time_t currentTime;
+static time_t currentTime;
 
 // server socket
-int servFd;
+static int servFd;
 
 // undelivered messages
-MapMessages messagesQueues;
+static MapMessages messagesQueues;
 
 // client sockets
-MapQueues queues;
+static MapQueues queues;
 
 
-int server(int argc, char ** argv){
+int server(int argc, char * argv){
 	// get and validate port number
 	if(argc != 2) error(1, 0, "Need 1 arg (port)");
-	auto port = readPort(argv[1]);
+	auto port = readPort(argv);
 	std::thread (monitorMessageQueue).detach();
 	// create socket
 	servFd = socket(AF_INET, SOCK_STREAM, 0);
@@ -198,7 +198,7 @@ int server(int argc, char ** argv){
 /****************************/
 }
 
-void monitorMessageQueue(){
+static void monitorMessageQueue(){
 	int position = 0;
 	while (true)
 	{
@@ -233,20 +233,20 @@ void monitorMessageQueue(){
 	}	
 }
 
-uint16_t readPort(char * txt){
+static uint16_t readPort(char * txt){
 	char * ptr;
 	auto port = strtol(txt, &ptr, 10);
 	if(*ptr!=0 || port<1 || (port>((1<<16)-1))) error(1,0,"illegal argument %s", txt);
 	return port;
 }
 
-void setReuseAddr(int sock){
+static void setReuseAddr(int sock){
 	const int one = 1;
 	int res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
 	if(res) error(1,errno, "setsockopt failed");
 }
 
-void ctrl_c(int){
+static void ctrl_c(int){
 	mutex.lock();
 	for(const auto& kv : queues){
 		for(int clientFd : kv.second){
@@ -260,7 +260,7 @@ void ctrl_c(int){
 	exit(0);
 }
 
-void sendToAllBut(int fd, std::string message, int count, std::string queueName){
+static void sendToAllBut(int fd, std::string message, int count, std::string queueName){
 	int res;
 	std::unordered_set<int> bad;
 
@@ -285,19 +285,19 @@ void sendToAllBut(int fd, std::string message, int count, std::string queueName)
 
 // CLIENT
 
-ssize_t readData(int fd, char * buffer, ssize_t buffsize){
+static ssize_t readData(int fd, char * buffer, ssize_t buffsize){
 	auto ret = read(fd, buffer, buffsize);
 	if(ret==-1) error(1,errno, "read failed on descriptor %d", fd);
 	return ret;
 }
 
-void writeData(int fd, char * buffer, ssize_t count){
+static void writeData(int fd, char * buffer, ssize_t count){
 	auto ret = write(fd, buffer, count);
 	if(ret==-1) error(1, errno, "write failed on descriptor %d", fd);
 	if(ret!=count) error(0, errno, "wrote less than requested to descriptor %d (%ld/%ld)", fd, count, ret);
 }
 
-void sendMessage(int sock, std::string message){
+static void sendMessage(int sock, std::string message){
 	//writeData(sock, buffer2, received2);
 	char cstr[message.size()+1];
 	message.copy(cstr, message.size() + 1);
@@ -305,7 +305,7 @@ void sendMessage(int sock, std::string message){
 	writeData(sock, cstr, message.size() + 1);
 }
 
-int connect(char * ip, char * port, std::string role, std::string queue){
+static int connect(char * ip, char * port, std::string role, std::string queue){
 	// Resolve arguments to IPv4 address with a port number
 	addrinfo *resolved, hints={.ai_flags=0, .ai_family=AF_INET, .ai_socktype=SOCK_STREAM};
 	int res = getaddrinfo(ip, port, &hints, &resolved);
@@ -383,3 +383,4 @@ std::string client_receive(int sock){
 	
 	return receivedMessage;
 }
+

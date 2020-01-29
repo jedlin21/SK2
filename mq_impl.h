@@ -5,8 +5,9 @@
     Informatyka, I2, semestr 5
 */
 
-#ifndef _mq_H_
-#define _mq_H_
+#ifndef _mq_impl_H_
+#define _mq_impl_H_
+
 
 #include <cstdlib>
 #include <cstdio>
@@ -32,6 +33,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <algorithm>
 
 // Server
@@ -42,7 +44,7 @@ struct Config {
 	int producentMessageLength;
 };
 
-void readConfig(std::string filePath);
+static void readConfig(std::string filePath);
 
 struct message {
     std::string mess;
@@ -50,35 +52,36 @@ struct message {
 };
 
 // handles SIGINT
-void ctrl_c(int);
+static void ctrl_c(int);
 
 // sends data to clientFds excluding fd
-void sendToAllBut(int fd, std::string message, int count, std::string queueName);
+static void sendToAllBut(int fd, std::string message, int count, std::string queueName);
 
 // converts cstring to port
-uint16_t readPort(char * txt);
+static uint16_t readPort(char * txt);
 
 // sets SO_REUSEADDR
-void setReuseAddr(int sock);
+static void setReuseAddr(int sock);
 
-void monitorMessageQueue();
+static void monitorMessageQueue();
 
-int server(int argc, char ** argv);
+int server(int argc, char * argv);
 
 
 // Client
-ssize_t readData(int fd, char * buffer, ssize_t buffsize);
+static ssize_t readData(int fd, char * buffer, ssize_t buffsize);
 
-void writeData(int fd, char * buffer, ssize_t count);
+static void writeData(int fd, char * buffer, ssize_t count);
 
-void sendMessage(int sock, std::string message);
+static void sendMessage(int sock, std::string message);
 
-int connect(char * ip, char * port, std::string role, std::string queue);
+static int connect(char * ip, char * port, std::string role, std::string queue);
 
 int client(char * ip, char * port, std::string role, std::string queue);
 
 void client_send(std::string message, int sock);
 
 std::string client_receive(int sock);
+
 
 #endif
