@@ -75,6 +75,10 @@ void sendMessage(int sock, std::string message);
 
 int connect(char * ip, char * port, std::string role, std::string queue);
 
-int client(int argc, char ** argv);
+int client(char * ip, char * port, std::string role, std::string queue);
+
+void client_send(std::string message, int sock);
+
+std::string client_receive(int sock);
 
 #endif

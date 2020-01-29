@@ -339,61 +339,47 @@ int connect(char * ip, char * port, std::string role, std::string queue){
 	}
 }
 
-int client(int argc, char ** argv){
-	if(argc!=5 && argc!=6) error(1,0,"Need 4 or 5 args: ip port producent/consumer queue [sec]");
-	std::string role = argv[3];
-	std::string queue = argv[4];
-
+int client(char * ip, char * port, std::string role, std::string queue){
 	// queue's name can't be longer than 240 characters
 	if ( queue.length() > 240 ) error(1,0,"Queue's name can not be longer than 240 characters!");
 
-	if (strcmp(role.c_str(), "producent") == 0 && argc !=6) error(1,0,"Need 5 args: ip port producent queue sec");
-
 	readConfig("config.ini");
 
-	int sock = connect(argv[1], argv[2], role, queue); 
+	int sock = connect(ip, port, role, queue); 
 
-	//	Prepare ultra long message
-	std::string ultraLongMessage;
-	while (ultraLongMessage.length() < config.producentMessageLength)
-		ultraLongMessage += 'a';
+	return sock;
+}
+	// //	Prepare ultra long message
+	// std::string ultraLongMessage;
+	// while (ultraLongMessage.length() < config.producentMessageLength)
+	// 	ultraLongMessage += 'a';
 	
-	int i = 0;
-	std::string message;
-	while (true){
-		if (strcmp(role.c_str(), "producent") == 0){
-			
-			// write to socket
-			message = "Message! " + queue + " " + std::to_string(i) + " ";
+	// int i = 0;
+void client_send(std::string message, int sock){
 
-			message += ultraLongMessage.substr(0, (config.producentMessageLength) - message.length());
-			i += 1;
-			sendMessage(sock, message);
-			int msgLength = message.length();
-			printf("Message sent, message length = %i\n", msgLength);
-			sleep(atoi(argv[5]));
-		}
-		else if (strcmp(role.c_str(), "consumer") == 0){
-			// read from socket, write to stdout
-			std::string receivedMessage;
-			char buffer1[255];
+	// write to socket
+	// message = "Message! " + queue + " " + std::to_string(i) + " ";
 
-			int count = read(sock, buffer1, 255);
-			if(count == -1) error(1,errno, "read failed on descriptor %d", sock);
-			if ( count > 0 ){
-				receivedMessage += std::string(buffer1, strlen(buffer1));
-				while ((count = recv(sock, buffer1, 255, MSG_DONTWAIT)) > 0) {
-					receivedMessage += std::string(buffer1, count);
-				}
-			}
+	// message += ultraLongMessage.substr(0, (config.producentMessageLength) - message.length());
+	sendMessage(sock, message);
+	int msgLength = message.length();
+	printf("Message sent, message length = %i\n", msgLength);
+}
 
-			sendMessage(1, receivedMessage);
-			printf("Received message. Length = %i\n", (int)(receivedMessage.length()));
+std::string client_receive(int sock){
+	// read from socket, write to stdout
+	std::string receivedMessage;
+	char buffer1[255];
+
+	int count = read(sock, buffer1, 255);
+	if(count == -1) error(1,errno, "read failed on descriptor %d", sock);
+	if ( count > 0 ){
+		receivedMessage += std::string(buffer1, strlen(buffer1));
+		while ((count = recv(sock, buffer1, 255, MSG_DONTWAIT)) > 0) {
+			receivedMessage += std::string(buffer1, count);
 		}
 	}
-/****************************/
 	
-	close(sock);
 	
-	return 0;
+	return receivedMessage;
 }
