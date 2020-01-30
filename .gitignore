@@ -31,5 +31,7 @@
 *.out
 *.app
 
-client
+# Compiled files
+client_prod
+client_cons
 server
