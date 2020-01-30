@@ -272,7 +272,7 @@ static void sendToAllBut(int fd, std::string message, int count, std::string que
 		// char cstr[count+1];
 		// message.copy(cstr, count + 1);
 		// cstr[count] = '\n';
-		std::cout << std::endl << "Message: " << cstr << " " << " count: " << count << std::endl;
+		//std::cout << std::endl << "Message: " << message.c_str() << " " << " count: " << count << std::endl;
 		res = send(clientFd, cstr, count, MSG_DONTWAIT);
 		if (res == -1) error(1, errno, "write failed on descriptor %d", fd);
 		if(res!=count)

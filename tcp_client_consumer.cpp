@@ -10,7 +10,6 @@ int main(int argc, char ** argv)
     int queue;
     std::string receivedMessage;
 
-    // if(argc!=5 && argc!=6) error(1,0,"Need 3 args: ip port queueName");
     printf("Starting client instance\n");
     char * ip = argv[1];
     char * port = argv[2];
