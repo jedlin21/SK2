@@ -7,7 +7,7 @@ lib2flag?=-Wl,-rpath,$$ORIGIN
 libraryImplementationFileName?="mq_impl.cpp"
 libraryFileName?="lib_mq.cpp"
 
-libraryOutputTemporary?="lib_mq.o"
+libraryOutputTemporary?="lib_mq.so"
 libraryOutputFileName?="lib_mq.a"
 
 serverFileName?="tcp_server.cpp"
@@ -32,7 +32,6 @@ libraryCompile: cleanLibrary
 	@echo "Compiling library"
 	g++ -shared -fPIC -o ${libraryOutputTemporary} ${libraryImplementationFileName} ${libraryFileName} ${flags}
 	ar rvs ${libraryOutputFileName} ${libraryOutputTemporary}
-	rm -rf ${libraryOutputTemporary}
 
 clean:
 	@echo "Cleaning directory from executable files."
