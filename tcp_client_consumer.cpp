@@ -22,11 +22,10 @@ int main(int argc, char ** argv)
     MessageBroker::MessageQueue mq = MessageBroker::MessageQueue();
 
     queue = mq.get_consumer_queue_fd(ip, port, queueName);
-    std::string message = "message";
 
     while(1){
         receivedMessage = mq.receive_message(queue);
-        std::cout << receivedMessage << " ||| Length = " << receivedMessage.length() << std::endl;
+        std::cout << "TEST " << receivedMessage << " ||| Length = " << receivedMessage.length() << std::endl;
     }
     printf("Closing..\n");
     return 0;

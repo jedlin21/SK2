@@ -267,9 +267,12 @@ static void sendToAllBut(int fd, std::string message, int count, std::string que
 	mutex.lock();
 	for(int clientFd : queues[queueName]){
 		if(clientFd == fd) continue;
-		char cstr[count+1];
-		message.copy(cstr, count + 1);
-		cstr[count] = '\n';
+		char cstr[count];
+		message.copy(cstr, count);
+		// char cstr[count+1];
+		// message.copy(cstr, count + 1);
+		// cstr[count] = '\n';
+		std::cout << std::endl << "Message: " << cstr << " " << " count: " << count << std::endl;
 		res = send(clientFd, cstr, count, MSG_DONTWAIT);
 		if (res == -1) error(1, errno, "write failed on descriptor %d", fd);
 		if(res!=count)
@@ -299,10 +302,13 @@ static void writeData(int fd, char * buffer, ssize_t count){
 
 static void sendMessage(int sock, std::string message){
 	//writeData(sock, buffer2, received2);
-	char cstr[message.size()+1];
-	message.copy(cstr, message.size() + 1);
-	cstr[message.size()] = '\n';
-	writeData(sock, cstr, message.size() + 1);
+	char cstr[message.size()];
+	message.copy(cstr, message.size());
+	// age.size()+1];
+	// message.copy(cstr, message.size() + 1);
+	// cstr[message.size()] = '\n';
+	// writeData(sock, cstr, message.size() + 1);
+	writeData(sock, cstr, message.size());
 }
 
 static int connect(char * ip, char * port, std::string role, std::string queue){
@@ -374,7 +380,7 @@ std::string client_receive(int sock){
 	int count = read(sock, buffer1, 255);
 	if(count == -1) error(1,errno, "read failed on descriptor %d", sock);
 	if ( count > 0 ){
-		receivedMessage += std::string(buffer1, strlen(buffer1));
+		receivedMessage += std::string(buffer1, count);
 		while ((count = recv(sock, buffer1, 255, MSG_DONTWAIT)) > 0) {
 			receivedMessage += std::string(buffer1, count);
 		}

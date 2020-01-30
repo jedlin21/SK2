@@ -26,7 +26,8 @@ void MessageBroker::MessageQueue::send_message(std::string message, int sock){
 }
 
 std::string MessageBroker::MessageQueue::receive_message(int sock){
-    std::string message;
+    std::string message = "";
+    std::cout << std::endl << "message before receive" << message << std::endl;
     message = client_receive(sock);
     return message;
 }

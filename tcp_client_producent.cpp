@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string>
+#include <iostream>
 
 #include "lib_mq.h"
 
@@ -22,11 +23,16 @@ int main(int argc, char ** argv)
     MessageBroker::MessageQueue mq = MessageBroker::MessageQueue();
 
     queue = mq.get_producent_queue_fd(ip, port, queueName);
-    std::string message = "message";
+    std::string base = "message ";
 
+    int i = 0;
+    std::string message;
     while(1){
+        message = base + std::to_string(i) + "\n";
+        std::cout << std::endl << message << std::endl;
         mq.send_message(message, queue);
         sleep(1);
+        i += 1;
     }
     printf("Closing..\n");
     return 0;
