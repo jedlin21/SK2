@@ -54,10 +54,10 @@ static MapMessages messagesQueues;
 static MapQueues queues;
 
 
-int server(int argc, char * argv){
+int server(int argc, int argv){
 	// get and validate port number
 	if(argc != 2) error(1, 0, "Need 1 arg (port)");
-	auto port = readPort(argv);
+	int port = argv;
 	std::thread (monitorMessageQueue).detach();
 	// create socket
 	servFd = socket(AF_INET, SOCK_STREAM, 0);

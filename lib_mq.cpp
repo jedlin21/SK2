@@ -6,9 +6,7 @@ MessageBroker::MessageQueue::MessageQueue(){}
 
 void MessageBroker::MessageQueue::queue_server(int port){
     int argc = 2;
-    char *argv;
-    sprintf(argv, "%d", port);
-    server(argc, argv);
+    server(argc, port);
 }
 
 int MessageBroker::MessageQueue::get_producent_queue_fd(char * ip, char * port, std::string queueName){
@@ -27,7 +25,7 @@ void MessageBroker::MessageQueue::send_message(std::string message, int sock){
 
 std::string MessageBroker::MessageQueue::receive_message(int sock){
     std::string message = "";
-    std::cout << std::endl << "message before receive" << message << std::endl;
+    //std::cout << std::endl << "message before receive" << message << std::endl;
     message = client_receive(sock);
     return message;
 }

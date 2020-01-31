@@ -65,7 +65,7 @@ static void setReuseAddr(int sock);
 
 static void monitorMessageQueue();
 
-int server(int argc, char * argv);
+int server(int argc, int argv);
 
 
 // Client
